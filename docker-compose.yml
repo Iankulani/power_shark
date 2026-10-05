@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  power-shark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: power-shark:1.0.0
+    container_name: power-shark
+    
+    # Required for network scanning / packet crafting
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+      - NET_BIND_SERVICE
+    
+    # Use host network for full network access
+    network_mode: host
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POWER_SHARK_HOME=/app
+      - TZ=UTC
+    
+    # Volume mounts for persistence
+    volumes:
+      - power-shark-data:/app/.power_shark
+      - power-shark-reports:/app/power_shark_reports
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    
+    # Interactive terminal
+    stdin_open: true
+    tty: true
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Web dashboard only
+  power-shark-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: power-shark:1.0.0
+    container_name: power-shark-web
+    
+    command: ["python3", "-c", "from power_shark import PowerShark; app = PowerShark(); app.web.start(); import time; time.sleep(999999)"]
+    
+    ports:
+      - "5000:5000"
+    
+    volumes:
+      - power-shark-data:/app/.power_shark
+      - power-shark-reports:/app/power_shark_reports
+    
+    restart: unless-stopped
+
+volumes:
+  power-shark-data:
+    driver: local
+  power-shark-reports:
+    driver: local
